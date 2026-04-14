@@ -1,0 +1,19 @@
+[Unit]
+Description=DHCP Management Web Interface
+After=network.target isc-dhcp-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/dhcp-web-admin
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=DHCP_CONF_PATH=/etc/dhcp/dhcpd.conf
+Environment=DHCP_LEASE_PATH=/var/lib/dhcp/dhcpd.leases
+# Ändere das Secret für die Produktion!
+Environment=JWT_SECRET=a-very-strong-secret-key-123
+
+[Install]
+WantedBy=multi-user.target
