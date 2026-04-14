@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Lock, User, LogIn, ShieldCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 
 const Login = ({ onLogin }) => {
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -16,7 +18,7 @@ const Login = ({ onLogin }) => {
       await axios.post('/api/login', { username, password });
       onLogin(username);
     } catch (err) {
-      setError('Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.');
+      setError(t('login.error'));
     } finally {
       setLoading(false);
     }
@@ -29,13 +31,13 @@ const Login = ({ onLogin }) => {
           <div style={{ display: 'inline-flex', padding: '1rem', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', marginBottom: '1rem' }}>
             <ShieldCheck size={32} />
           </div>
-          <h1 style={{ fontSize: '1.5rem', margin: 0 }}>System Login</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.5rem' }}>DHCP Management Interface</p>
+          <h1 style={{ fontSize: '1.5rem', margin: 0 }}>{t('login.title')}</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.5rem' }}>{t('login.subtitle')}</p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Benutzername</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t('login.username')}</label>
             <div style={{ position: 'relative' }}>
               <User size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
               <input 
@@ -43,14 +45,14 @@ const Login = ({ onLogin }) => {
                 value={username} 
                 onChange={(e) => setUsername(e.target.value)}
                 style={{ width: '100%', padding: '0.75rem 0.75rem 0.75rem 40px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white', outline: 'none' }}
-                placeholder="Linux Username"
+                placeholder={t('login.placeholder_user')}
                 required
               />
             </div>
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Passwort</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t('login.password')}</label>
             <div style={{ position: 'relative' }}>
               <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
               <input 
@@ -68,7 +70,7 @@ const Login = ({ onLogin }) => {
 
           <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.875rem' }} disabled={loading}>
             <LogIn size={18} />
-            {loading ? 'Anmelden...' : 'Anmelden'}
+            {loading ? t('login.signing_in') : t('login.button')}
           </button>
         </form>
       </div>

@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Wifi, Cpu, Settings, Globe } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, Wifi, Cpu, Settings, Globe, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 const ConfigEditor = () => {
+  const { t } = useTranslation();
   const [config, setConfig] = useState({ subnets: [], hosts: [], globals: [] });
   const [activeTab, setActiveTab] = useState(localStorage.getItem('activeConfigTab') || 'subnets');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   
-  // Search and Filter states for Hosts
-  const [hostFilter, setHostFilter] = useState('');
+  // Search and Filter states
+  const [searchTerm, setSearchTerm] = useState('');
   const [activePoolFilter, setActivePoolFilter] = useState('All');
 
   useEffect(() => {
@@ -24,6 +27,7 @@ const ConfigEditor = () => {
   }, []);
 
   const fetchConfig = async () => {
+    setLoading(true);
     try {
       const response = await axios.get('/api/config');
       setConfig(response.data);
@@ -35,7 +39,7 @@ const ConfigEditor = () => {
   };
 
   const openModal = (type, item = null) => {
-    setEditingItem(item ? { ...item, type } : { type });
+    setEditingItem(item ? { ...item, _type: type } : { _type: type });
     setFormData(item || getEmptyEntity(type));
     setShowModal(true);
   };
@@ -46,38 +50,49 @@ const ConfigEditor = () => {
     return {};
   };
 
-  const handleSave = async () => {
-    const endpoint = editingItem.type === 'host' ? '/api/hosts' : '/api/subnets';
+  const handleSave = async (e) => {
+    if (e) e.preventDefault();
+    setSaving(true);
+    const type = editingItem._type;
+    const endpoint = type === 'host' ? '/api/hosts' : '/api/subnets';
+    
     try {
-      const response = await axios.post(endpoint, formData);
-      if (response.data.message) {
-        // Show success including restart message
-        console.log(response.data.message);
+      if (editingItem.id || editingItem.network) {
+        // Edit mode (assuming the API supports PUT or identifies by ID in POST)
+        // For simplicity based on original logic, we use POST for both or have specific logic
+        await axios.post(endpoint, formData);
+      } else {
+        await axios.post(endpoint, formData);
       }
       setShowModal(false);
       fetchConfig();
     } catch (err) {
-      alert('Fehler: ' + err.message);
+      alert(t('common.error') + ': ' + err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
   const saveGlobals = async () => {
+    setSaving(true);
     try {
       await axios.post('/api/globals', { globals: config.globals });
-      alert('Globale Einstellungen gespeichert und Service neu gestartet');
+      alert(t('common.success'));
     } catch (err) {
-      alert('Fehler');
+      alert(t('common.error'));
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async (type, id) => {
-    if (!confirm('Wirklich löschen?')) return;
+    if (!confirm(t('config.confirm_delete'))) return;
     const endpoint = type === 'host' ? `/api/hosts/${id}` : `/api/subnets/${id}`;
     try {
       await axios.delete(endpoint);
       fetchConfig();
     } catch (err) {
-      alert('Fehler');
+      alert(t('common.error'));
     }
   };
 
@@ -90,266 +105,262 @@ const ConfigEditor = () => {
 
   const filteredHosts = config.hosts.filter(h => {
     const matchesSearch = 
-      (h.name || '').toLowerCase().includes(hostFilter.toLowerCase()) ||
-      (h.address || '').includes(hostFilter) ||
-      (h.hardware || '').toLowerCase().includes(hostFilter.toLowerCase()) ||
-      (h.hostname || '').toLowerCase().includes(hostFilter.toLowerCase());
+      (h.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (h.address || '').includes(searchTerm) ||
+      (h.hardware || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (h.hostname || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesPool = activePoolFilter === 'All' || isIpInSubnet(h.address, activePoolFilter);
-    
     return matchesSearch && matchesPool;
   });
 
+  const filteredSubnets = config.subnets.filter(s => 
+    s.network.includes(searchTerm)
+  );
+
   return (
-    <>
-      <div className="fade-in">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2.5rem' }}>
-          <h1>Konfiguration</h1>
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--panel-bg)', padding: '0.25rem', borderRadius: '8px' }}>
-            <TabBtn active={activeTab === 'subnets'} onClick={() => setActiveTab('subnets')} icon={<Wifi size={18} />} label="Subnetze" />
-            <TabBtn active={activeTab === 'hosts'} onClick={() => setActiveTab('hosts')} icon={<Cpu size={18} />} label="Reservierungen" />
-            <TabBtn active={activeTab === 'globals'} onClick={() => setActiveTab('globals')} icon={<Globe size={18} />} label="Global" />
+    <div className="fade-in" style={{ padding: '2rem' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2.5rem', alignItems: 'center' }}>
+        <div>
+          <h1 style={{ fontSize: '1.875rem', fontWeight: 600, margin: 0 }}>{t('config.title')}</h1>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>DHCP Server Settings & Reservations</p>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.25rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+          <TabBtn active={activeTab === 'subnets'} onClick={() => setActiveTab('subnets')} icon={<Wifi size={18} />} label={t('config.subnets')} />
+          <TabBtn active={activeTab === 'hosts'} onClick={() => setActiveTab('hosts')} icon={<Cpu size={18} />} label={t('config.hosts')} />
+          <TabBtn active={activeTab === 'globals'} onClick={() => setActiveTab('globals')} icon={<Globe size={18} />} label={t('config.globals')} />
+        </div>
+      </header>
+
+      {activeTab === 'subnets' && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
+            <h2>{t('config.subnet_pools')}</h2>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ position: 'relative', width: '250px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <input type="text" placeholder={t('common.search')} className="input-field" style={{ paddingLeft: '32px' }} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              </div>
+              <button className="btn btn-primary" onClick={() => openModal('subnet')}><Plus size={18} /> {t('config.add_subnet')}</button>
+            </div>
+          </div>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t('config.network')}</th>
+                  <th>{t('config.netmask')}</th>
+                  <th>{t('config.pools')}</th>
+                  <th>{t('config.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan="4">{t('common.loading')}</td></tr>
+                ) : filteredSubnets.map((s, idx) => (
+                  <tr key={idx}>
+                    <td><strong>{s.network}</strong></td>
+                    <td><code>{s.netmask}</code></td>
+                    <td>
+                      {s.pools?.map((p, pidx) => (
+                        <div key={pidx} style={{ fontSize: '0.8rem' }}>{p.start} - {p.end}</div>
+                      ))}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button className="btn btn-ghost" onClick={() => openModal('subnet', s)}><Edit2 size={16} /></button>
+                        <button className="btn btn-ghost" style={{ color: 'var(--accent-red)' }} onClick={() => handleDelete('subnet', s.network)}><Trash2 size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
+      )}
 
-        {activeTab === 'subnets' && (
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h2>Subnetz-Pools</h2>
-              <button className="btn btn-primary" onClick={() => openModal('subnet')}><Plus size={18} /> Neu</button>
-            </div>
-            <DataTable 
-              headers={['Netzwerk', 'Netmask', 'Pools', 'Aktionen']}
-              data={config.subnets}
-              renderRow={(s) => (
-                <tr key={s.id}>
-                  <td><strong>{s.network}</strong></td>
-                  <td>{s.netmask}</td>
-                  <td>{s.pools?.map(p => `${p.start}-${p.end}`).join(', ')}</td>
-                  <td>
-                    <ActionBtns onEdit={() => openModal('subnet', s)} onDelete={() => handleDelete('subnet', s.id)} />
-                  </td>
-                </tr>
-              )}
-            />
-          </div>
-        )}
-
-        {activeTab === 'hosts' && (
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <h2>Host Reservierungen</h2>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <div style={{ position: 'relative', width: '200px' }}>
-                   <input 
-                    type="text" 
-                    placeholder="Suchen..." 
-                    className="input-field" 
-                    style={{ width: '100%', padding: '0.5rem' }} 
-                    value={hostFilter}
-                    onChange={e => setHostFilter(e.target.value)}
-                  />
-                </div>
-                <button className="btn btn-primary" onClick={() => openModal('host')}><Plus size={18} /> Neu</button>
+      {activeTab === 'hosts' && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <h2>{t('config.host_reservations')}</h2>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div style={{ position: 'relative', width: '250px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <input type="text" placeholder={t('common.search')} className="input-field" style={{ paddingLeft: '32px' }} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
               </div>
+              <button className="btn btn-primary" onClick={() => openModal('host')}><Plus size={18} /> {t('config.add_host')}</button>
             </div>
+          </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-              <button 
-                className={`btn btn-sm ${activePoolFilter === 'All' ? 'btn-primary' : 'btn-ghost'}`} 
-                onClick={() => setActivePoolFilter('All')}
-              >
-                Alle
-              </button>
-              {config.subnets.map(s => (
-                <button 
-                  key={s.network}
-                  className={`btn btn-sm ${activePoolFilter === s.network ? 'btn-primary' : 'btn-ghost'}`} 
-                  onClick={() => setActivePoolFilter(s.network)}
-                >
-                  {s.network}
-                </button>
-              ))}
-            </div>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <button className={`btn btn-sm ${activePoolFilter === 'All' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActivePoolFilter('All')}>{t('dashboard.all_pools')}</button>
+            {config.subnets.map(s => (
+              <button key={s.network} className={`btn btn-sm ${activePoolFilter === s.network ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActivePoolFilter(s.network)}>{s.network}</button>
+            ))}
+          </div>
 
-            <DataTable 
-              headers={['Name', 'MAC', 'IP', 'Hostname', 'Aktionen']}
-              data={filteredHosts}
-              renderRow={(h) => (
-                <tr key={h.id}>
-                  <td>{h.name} {h.type === 'subclass' && <span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>Subclass</span>}</td>
-                  <td><code>{h.hardware}</code></td>
-                  <td><strong style={{ color: 'var(--accent-blue)' }}>{h.address}</strong></td>
-                  <td>{h.hostname || '-'}</td>
-                  <td>
-                    <ActionBtns onEdit={() => openModal('host', h)} onDelete={() => handleDelete('host', h.id)} />
-                  </td>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t('config.name')}</th>
+                  <th>{t('config.mac')}</th>
+                  <th>{t('config.ip')}</th>
+                  <th>{t('config.hostname')}</th>
+                  <th>{t('config.actions')}</th>
                 </tr>
-              )}
-            />
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan="5">{t('common.loading')}</td></tr>
+                ) : filteredHosts.map((h, idx) => (
+                  <tr key={idx}>
+                    <td><strong>{h.name}</strong></td>
+                    <td><code>{h.hardware}</code></td>
+                    <td><code>{h.address}</code></td>
+                    <td>{h.hostname || '-'}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button className="btn btn-ghost" onClick={() => openModal('host', h)}><Edit2 size={16} /></button>
+                        <button className="btn btn-ghost" style={{ color: 'var(--accent-red)' }} onClick={() => handleDelete('host', h.id)}><Trash2 size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
+      )}
 
-        {activeTab === 'globals' && (
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h2>Globale Optionen</h2>
-              <button className="btn btn-primary" onClick={saveGlobals}><Save size={18} /> Speichern</button>
-            </div>
-            <textarea 
-              className="input-field"
-              style={{ width: '100%', height: '300px', fontFamily: 'monospace', padding: '1rem' }}
-              value={config.globals.join('\n')}
-              onChange={(e) => setConfig({...config, globals: e.target.value.split('\n')})}
-              placeholder="z.B. option domain-name-servers 8.8.8.8;"
-            />
+      {activeTab === 'globals' && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
+            <h2>{t('config.global_options')}</h2>
+            <button className="btn btn-primary" onClick={saveGlobals} disabled={saving}><Save size={18} /> {saving ? t('config.saving') : t('common.save')}</button>
           </div>
-        )}
-      </div>
+          <textarea 
+            className="input-field"
+            style={{ width: '100%', height: '400px', fontFamily: 'monospace', padding: '1rem', fontSize: '0.9rem', lineHeight: '1.5' }}
+            value={config.globals.join('\n')}
+            onChange={(e) => setConfig({...config, globals: e.target.value.split('\n')})}
+            placeholder={t('config.global_placeholder')}
+          />
+        </div>
+      )}
 
       <AnimatePresence>
         {showModal && (
-          <Modal close={() => setShowModal(false)} title={editingItem?.id ? 'Bearbeiten' : 'Neu'} onSave={handleSave}>
-            {editingItem?.type === 'host' ? (
-              <HostForm data={formData} set={setFormData} />
+          <Modal close={() => setShowModal(false)} title={editingItem?.id || editingItem?.network ? t('config.edit_item') : t('config.new_item')} onSave={handleSave} saving={saving}>
+            {editingItem._type === 'host' ? (
+              <HostForm data={formData} set={setFormData} t={t} />
             ) : (
-              <SubnetForm data={formData} set={setFormData} />
+              <SubnetForm data={formData} set={setFormData} t={t} />
             )}
           </Modal>
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 };
 
 const TabBtn = ({ active, onClick, icon, label }) => (
-  <button className={`btn ${active ? 'btn-primary' : 'btn-ghost'}`} onClick={onClick}>{icon} {label}</button>
+  <button className={`btn ${active ? 'btn-primary' : 'btn-ghost'}`} onClick={onClick} style={{ borderRadius: '8px' }}>{icon} {label}</button>
 );
 
-const ActionBtns = ({ onEdit, onDelete }) => (
-  <div style={{ display: 'flex', gap: '0.25rem' }}>
-    <button className="btn btn-ghost" onClick={onEdit}><Edit2 size={16} /></button>
-    <button className="btn btn-ghost" style={{ color: 'var(--accent-red)' }} onClick={onDelete}><Trash2 size={16} /></button>
-  </div>
-);
-
-const DataTable = ({ headers, data, renderRow }) => (
-  <div className="table-container">
-    <table>
-      <thead><tr>{headers.map(h => <th key={h}>{h}</th>)}</tr></thead>
-      <tbody>{data.map(renderRow)}</tbody>
-    </table>
-  </div>
-);
-
-const Modal = ({ children, close, title, onSave }) => {
-  useEffect(() => {
-    const originalStyle = window.getComputedStyle(document.body).overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = originalStyle; };
-  }, []);
-
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay">
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="modal-content">
-        <div className="modal-header">
-          <h3>{title}</h3>
-          <button className="btn btn-ghost" onClick={close}><X /></button>
-        </div>
-        <div className="modal-body">{children}</div>
-        <div className="modal-footer">
-          <button className="btn btn-ghost" onClick={close}>Abbrechen</button>
-          <button className="btn btn-primary" onClick={onSave}>Speichern</button>
-        </div>
-      </motion.div>
+const Modal = ({ children, close, title, onSave, saving, t }) => (
+  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay">
+    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="modal-content card" style={{ maxWidth: '600px', width: '90%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h2 style={{ margin: 0 }}>{title}</h2>
+        <button className="btn btn-ghost" onClick={close}><X /></button>
+      </div>
+      <div style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: '0.5rem' }}>{children}</div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
+        <button className="btn btn-ghost" onClick={close}>Cancel</button>
+        <button className="btn btn-primary" onClick={onSave} disabled={saving}>{saving ? '...' : 'Save'}</button>
+      </div>
     </motion.div>
-  );
-};
+  </motion.div>
+);
 
-const HostForm = ({ data, set }) => (
-  <div className="form-group">
-    <Input label="Eindeutiger Name" value={data.name} onChange={v => set({...data, name: v})} />
-    <Input label="MAC Adresse" value={data.hardware} onChange={v => set({...data, hardware: v})} />
-    <Input label="IP Adresse" value={data.address} onChange={v => set({...data, address: v})} />
-    <Input label="Option Hostname" value={data.hostname} onChange={v => set({...data, hostname: v})} />
+const HostForm = ({ data, set, t }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <Input label={t('config.internal_name')} value={data.name} onChange={v => set({...data, name: v})} />
+    <Input label={t('config.mac')} value={data.hardware} onChange={v => set({...data, hardware: v})} placeholder="00:00:00:00:00:00" />
+    <Input label={t('config.ip')} value={data.address} onChange={v => set({...data, address: v})} />
+    <Input label={t('config.hostname')} value={data.hostname} onChange={v => set({...data, hostname: v})} />
   </div>
 );
 
-const SubnetForm = ({ data, set }) => (
-  <div className="form-group">
-    <Input label="Netzwerk" value={data.network} onChange={v => set({...data, network: v})} />
-    <Input label="Netmask" value={data.netmask} onChange={v => set({...data, netmask: v})} />
+const SubnetForm = ({ data, set, t }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <Input label={t('config.subnet_network')} value={data.network} onChange={v => set({...data, network: v})} />
+    <Input label={t('config.subnet_netmask')} value={data.netmask} onChange={v => set({...data, netmask: v})} />
     
-    <div style={{ marginBottom: '1.5rem' }}>
-      <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Pools & Spezifische Optionen</label>
+    <div>
+      <label style={{ display: 'block', marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600 }}>{t('config.pool_range')}</label>
       {data.pools.map((p, i) => (
-        <div key={i} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', background: 'rgba(255,255,255,0.02)' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <input type="text" placeholder="Start IP" className="input-field" style={{ flex: 1, padding: '0.5rem' }} value={p.start} onChange={e => {
-              const pools = [...data.pools]; pools[i].start = e.target.value; set({...data, pools});
-            }} />
-            <input type="text" placeholder="End IP" className="input-field" style={{ flex: 1, padding: '0.5rem' }} value={p.end} onChange={e => {
-              const pools = [...data.pools]; pools[i].end = e.target.value; set({...data, pools});
-            }} />
-            <button className="btn btn-ghost" onClick={() => {
+        <div key={i} style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.25rem', background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ flex: 1 }}>
+              <input type="text" placeholder={t('config.start_ip')} className="input-field" value={p.start} onChange={e => {
+                const pools = [...data.pools]; pools[i].start = e.target.value; set({...data, pools});
+              }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <input type="text" placeholder={t('config.end_ip')} className="input-field" value={p.end} onChange={e => {
+                const pools = [...data.pools]; pools[i].end = e.target.value; set({...data, pools});
+              }} />
+            </div>
+            <button className="btn btn-ghost" style={{ color: 'var(--accent-red)' }} onClick={() => {
               const pools = data.pools.filter((_, idx) => idx !== i); set({...data, pools});
-            }}><Trash2 size={16} /></button>
+            }}><Trash2 size={18} /></button>
           </div>
           
           <div style={{ paddingLeft: '1rem', borderLeft: '2px solid var(--accent-blue)' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Pool Optionen (z.B. option routers 10.0.0.1)</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{t('config.pool_options')}</label>
             {(p.options || []).map((opt, optIdx) => (
-              <div key={optIdx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  style={{ flex: 1, padding: '0.25rem 0.5rem', fontSize: '0.875rem' }} 
-                  value={opt} 
-                  onChange={e => {
-                    const pools = [...data.pools];
-                    pools[i].options[optIdx] = e.target.value;
-                    set({...data, pools});
-                  }}
-                />
+              <div key={optIdx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input type="text" className="input-field" style={{ flex: 1, fontSize: '0.875rem' }} value={opt} onChange={e => {
+                  const pools = [...data.pools]; pools[i].options[optIdx] = e.target.value; set({...data, pools});
+                }} />
                 <button className="btn btn-ghost btn-sm" onClick={() => {
-                  const pools = [...data.pools];
-                  pools[i].options = pools[i].options.filter((_, idx) => idx !== optIdx);
-                  set({...data, pools});
+                  const pools = [...data.pools]; pools[i].options = pools[i].options.filter((_, idx) => idx !== optIdx); set({...data, pools});
                 }}><X size={14} /></button>
               </div>
             ))}
-            <button className="btn btn-ghost btn-sm" style={{ marginTop: '0.25rem', fontSize: '0.75rem' }} onClick={() => {
-              const pools = [...data.pools];
-              pools[i].options = [...(pools[i].options || []), ''];
-              set({...data, pools});
-            }}><Plus size={14} /> Option hinzufügen</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => {
+              const pools = [...data.pools]; pools[i].options = [...(pools[i].options || []), '']; set({...data, pools});
+            }}><Plus size={14} /> {t('config.add_option')}</button>
           </div>
         </div>
       ))}
-      <button className="btn btn-ghost btn-sm" onClick={() => set({...data, pools: [...data.pools, {start: '', end: '', options: []}]})}><Plus size={16} /> Pool hinzufügen</button>
+      <button className="btn btn-ghost btn-sm" onClick={() => set({...data, pools: [...data.pools, {start: '', end: '', options: []}]})}><Plus size={16} /> {t('config.add_pool')}</button>
     </div>
 
-    <div style={{ marginBottom: '1rem' }}>
-      <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Allgemeine Subnetz-Optionen</label>
+    <div>
+      <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600 }}>{t('config.general_subnet_options')}</label>
       {(data.options || []).map((o, i) => (
-        <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.25rem' }}>
-          <input type="text" className="input-field" style={{ flex: 1, padding: '0.5rem' }} value={o} onChange={e => {
+        <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+          <input type="text" className="input-field" style={{ flex: 1 }} value={o} onChange={e => {
             const options = [...data.options]; options[i] = e.target.value; set({...data, options});
           }} />
-          <button className="btn btn-ghost" onClick={() => {
+          <button className="btn btn-ghost" style={{ color: 'var(--accent-red)' }} onClick={() => {
             const options = data.options.filter((_, idx) => idx !== i); set({...data, options});
-          }}><Trash2 size={16} /></button>
+          }}><Trash2 size={18} /></button>
         </div>
       ))}
-      <button className="btn btn-ghost btn-sm" onClick={() => set({...data, options: [...(data.options || []), '']})}><Plus size={16} /> Subnetz-Option hinzufügen</button>
+      <button className="btn btn-ghost btn-sm" onClick={() => set({...data, options: [...(data.options || []), '']})}><Plus size={16} /> {t('config.add_subnet_option')}</button>
     </div>
   </div>
 );
 
-const Input = ({ label, value, onChange }) => (
-  <div style={{ marginBottom: '1rem' }}>
+const Input = ({ label, value, onChange, placeholder }) => (
+  <div>
     <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{label}</label>
-    <input type="text" value={value || ''} onChange={e => onChange(e.target.value)} className="input-field" style={{ width: '100%', padding: '0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }} />
+    <input type="text" value={value || ''} onChange={e => onChange(e.target.value)} className="input-field" style={{ width: '100%' }} placeholder={placeholder} />
   </div>
 );
 

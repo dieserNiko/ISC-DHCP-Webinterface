@@ -1,67 +1,93 @@
 # ISC-DHCP Webinterface
 
-Ein modernes, performantes und sicheres Webinterface zur Verwaltung von ISC-DHCP-Servern. Entwickelt für Geschwindigkeit, Übersichtlichkeit und einfache Bedienung.
+A modern, high-performance, and secure web interface for managing ISC-DHCP servers. Designed for speed, clarity, and ease of use.
 
 ![Dashboard Demo](https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&q=80&w=1000)
 
 ## Features
 
-- 🚀 **Echtzeit-Dashboard**: Behalte aktive Leases und den Serverstatus immer im Blick.
-- 🔍 **Intelligente Suche**: Filtere Leases und Reservierungen nach IP, Hostname oder MAC-Adresse.
-- 🗂️ **Pool-Management**: Organisiere deine Subnetze in übersichtlichen Tabs.
-- 📝 **Live-Protokoll**: Verfolge DHCP-Ereignisse (Requests, ACKs, Offers) in Echtzeit direkt im Browser.
-- 🔒 **Sicherheit**: Authentifizierung über System-PAM (Linux-Benutzer) und JWT-Sitzungen.
-- ⚙️ **Konfigurations-Editor**: Bearbeite Hosts, Subnetze und globale Optionen mit automatischer Syntax-Generierung und Dienst-Neustart.
-- 🎨 **Premium Design**: Modernes Dark-Mode Interface mit flüssigen Animationen (Framer Motion).
+- 🚀 **Real-time Dashboard**: Monitor active leases and server status at a glance.
+- 🔍 **Intelligent Search**: Filter leases and reservations by IP, hostname, or MAC address.
+- 🗂️ **Pool Management**: Organize your subnets into clear tabs.
+- 📝 **Live Logs**: Track DHCP events (Requests, ACKs, Offers) in real-time directly in the browser.
+- 🔒 **Security**: Authentication via system PAM (Linux users) and JWT sessions.
+- ⚙️ **Config Editor**: Edit hosts, subnets, and global options with automatic syntax generation and service restart.
+- 🎨 **Premium Design**: Modern dark-mode interface with smooth animations (Framer Motion).
+- 🌍 **Multilingual**: Support for English and German with user-selectable language preferences.
 
-## Technologie-Stack
+## Technology Stack
 
-- **Frontend**: React, Vite, Lucide Icons, Framer Motion
+- **Frontend**: React, Vite, Lucide Icons, Framer Motion, i18next
 - **Backend**: Node.js, Express, node-linux-pam
-- **DHCP**: ISC-DHCP-Server integration via `dhcpd.conf` und `dhcpd.leases`
+- **DHCP**: ISC-DHCP-Server integration via `dhcpd.conf` and `dhcpd.leases`
 
 ## Installation
 
-### Voraussetzungen
+### Prerequisites
 
 - Ubuntu/Debian Linux
 - Node.js (v18+)
 - ISC-DHCP-Server (`isc-dhcp-server`)
-- Build-Werkzeuge (`build-essential`, `libpam0g-dev`)
+- Build tools (`build-essential`, `libpam0g-dev`)
 
 ### Setup
 
-1. Repository klonen:
+1. Clone the repository:
    ```bash
    git clone https://github.com/dieserNiko/ISC-DHCP-Webinterface.git
    cd ISC-DHCP-Webinterface
    ```
 
-2. Abhängigkeiten installieren:
+2. Install dependencies:
    ```bash
    npm install
    ```
 
-3. Frontend bauen:
+3. Build the frontend:
    ```bash
    npm run build
    ```
 
-4. Systemd Service einrichten (optional):
-   Passe die Pfade in `dhcp-web-admin.service` an und kopiere sie:
+4. Set up the Systemd service (optional):
+   Adjust the paths in `dhcp-web-admin.service` and copy it:
    ```bash
    sudo cp dhcp-web-admin.service /etc/systemd/system/
    sudo systemctl enable dhcp-web-admin
    sudo systemctl start dhcp-web-admin
    ```
 
-## Sicherheitshinweise
+## Security Notes
 
-- Die Anwendung sollte standardmäßig hinter einem Reverse-Proxy (z. B. Nginx mit SSL) betrieben werden.
-- Stelle sicher, dass das `JWT_SECRET` in der Produktionsumgebung geändert wird.
-- Der Dienst benötigt Root-Rechte, um die DHCP-Konfigurationsdateien zu lesen/schreiben und den Dienst neu zu starten.
+- The application should be run behind a reverse proxy (e.g., Nginx with SSL) by default.
+- Ensure that the `JWT_SECRET` is changed in the production environment.
+- The service requires root privileges to read/write DHCP configuration files and restart the service.
 
-## Lizenz
+## License
 
-MIT License - Copyright (c) 2026 **B&W NetworX GmbH & Co. KG** und **Niko Meister**.
-Siehe [LICENSE](LICENSE) für Details.
+MIT License - Copyright (c) 2026 **B&W NetworX GmbH & Co. KG** and **Niko Meister**.
+See [LICENSE](LICENSE) for details.
+
+---
+
+# Deutsche Version (German Version)
+
+Ein modernes, performantes und sicheres Webinterface zur Verwaltung von ISC-DHCP-Servern.
+
+## Features (DE)
+
+- 🚀 **Echtzeit-Dashboard**: Behalte aktive Leases und den Serverstatus immer im Blick.
+- 🔍 **Intelligente Suche**: Filtere Leases und Reservierungen nach IP, Hostname oder MAC-Adresse.
+- 🗂️ **Pool-Management**: Organisiere deine Subnetze in übersichtlichen Tabs.
+- 📝 **Live-Protokoll**: Verfolge DHCP-Ereignisse in Echtzeit direkt im Browser.
+- 🔒 **Sicherheit**: Authentifizierung über System-PAM und JWT-Sitzungen.
+- ⚙️ **Konfigurations-Editor**: Bearbeite Hosts, Subnetze und globale Optionen.
+- 🌍 **Mehrsprachig**: Unterstützung für Englisch und Deutsch mit Sprachauswahl pro Nutzer.
+
+## Installation (DE)
+
+Befreie dich von der manuellen Bearbeitung von Konfigurationsdateien. Folge den oben genannten Schritten im englischen Bereich für das Setup.
+
+## Copyright
+
+© 2026 **B&W NetworX GmbH & Co. KG** & **Niko Meister**
+Dieses Projekt ist Open Source unter der MIT-Lizenz.

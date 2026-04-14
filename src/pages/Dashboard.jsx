@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Database, Users, RefreshCw, UserPlus, Filter, Trash2 } from 'lucide-react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 const Dashboard = () => {
+  const { t } = useTranslation();
   const [leases, setLeases] = useState([]);
   const [subnets, setSubnets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [restarting, setRestarting] = useState(false);
-  const [filter, setFilter] = useState('');
+  const [searchFilter, setSearchFilter] = useState('');
   const [activePool, setActivePool] = useState(localStorage.getItem('activeDashboardPool') || 'All');
 
   useEffect(() => {
@@ -35,19 +37,18 @@ const Dashboard = () => {
   };
 
   const deleteLease = async (ip) => {
-    if (!confirm(`Lease für ${ip} wirklich unwiderruflich löschen? Der DHCP-Server wird dabei kurz neu gestartet.`)) return;
+    if (!confirm(t('dashboard.confirm_delete_lease', { ip }))) return;
     try {
       await axios.delete(`/api/leases/${ip}`);
-      alert('Lease wurde gelöscht.');
       fetchData();
     } catch (err) {
-      alert('Fehler beim Löschen.');
+      alert(t('common.error'));
     }
   };
 
   const convertToReservation = async (lease) => {
     const name = lease['client-hostname'] || `host-${lease.ip.replace(/\./g, '-')}`;
-    if (!confirm(`Lease ${lease.ip} in feste Reservierung "${name}" umwandeln?`)) return;
+    if (!confirm(t('dashboard.confirm_convert', { name }))) return;
     
     try {
       await axios.post('/api/hosts', {
@@ -57,20 +58,20 @@ const Dashboard = () => {
         address: lease.ip,
         hostname: lease['client-hostname']
       });
-      alert('Erfolgreich umgewandelt. Gehe zu Konfiguration -> Reservierungen zum Prüfen.');
+      alert(t('dashboard.convert_success'));
     } catch (err) {
-      alert('Fehler bei der Umwandlung.');
+      alert(t('common.error'));
     }
   };
 
   const restartService = async () => {
-    if (!confirm('DHCP-Server wirklich neu starten?')) return;
+    if (!confirm(t('dashboard.confirm_restart'))) return;
     setRestarting(true);
     try {
       await axios.post('/api/restart');
-      alert('Erfolgreich neu gestartet');
+      alert(t('common.success'));
     } catch (err) {
-      alert('Fehler');
+      alert(t('common.error'));
     } finally {
       setRestarting(false);
     }
@@ -86,23 +87,23 @@ const Dashboard = () => {
   const filteredByPool = leases.filter(l => activePool === 'All' || isIpInSubnet(l.ip, activePool));
 
   const filteredLeases = filteredByPool.filter(l => 
-    (l.ip || '').includes(filter) || 
-    (l['client-hostname'] || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (l['hardware ethernet'] || '').toLowerCase().includes(filter.toLowerCase())
+    (l.ip || '').includes(searchFilter) || 
+    (l['client-hostname'] || '').toLowerCase().includes(searchFilter.toLowerCase()) ||
+    (l['hardware ethernet'] || '').toLowerCase().includes(searchFilter.toLowerCase())
   );
 
   return (
-    <div className="fade-in">
+    <div className="fade-in" style={{ padding: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h1>Dashboard</h1>
+        <h1>{t('dashboard.title')}</h1>
         <button className="btn btn-primary" onClick={restartService} disabled={restarting}>
           <RefreshCw size={18} className={restarting ? 'spin' : ''} />
-          {restarting ? 'Neustart...' : 'Service Neustart'}
+          {restarting ? t('dashboard.restarting') : t('dashboard.restart_service')}
         </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
-        <StatCard icon={<Users />} label="Aktive Leases" val={leases.length} color="var(--accent-blue)" />
+        <StatCard icon={<Users />} label={t('dashboard.active_leases')} val={leases.length} color="var(--accent-blue)" />
         <div className="card">
           <div style={{ color: 'var(--accent-green)', marginBottom: '0.5rem' }}><Activity size={24} /></div>
           <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Server Status</div>
@@ -110,7 +111,7 @@ const Dashboard = () => {
         </div>
         <div className="card">
           <div style={{ color: '#a855f7', marginBottom: '0.5rem' }}><Database size={24} /></div>
-          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Config Integrität</div>
+          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Config Integrity</div>
           <div className="badge badge-blue">Valid</div>
         </div>
       </div>
@@ -120,7 +121,7 @@ const Dashboard = () => {
           className={`btn ${activePool === 'All' ? 'btn-primary' : 'btn-ghost'}`} 
           onClick={() => setActivePool('All')}
         >
-          Alle Pools
+          {t('dashboard.all_pools')}
         </button>
         {subnets.map(s => (
           <button 
@@ -135,16 +136,16 @@ const Dashboard = () => {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2>Aktuelle Leases</h2>
+          <h2>{t('dashboard.current_leases')}</h2>
           <div style={{ position: 'relative', width: '250px' }}>
             <Filter size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
             <input 
               type="text" 
-              placeholder="Suchen (IP/Name)..." 
+              placeholder={t('dashboard.search_placeholder')} 
               className="input-field" 
               style={{ width: '100%', padding: '0.5rem 0.5rem 0.5rem 32px', fontSize: '0.875rem' }}
-              value={filter}
-              onChange={e => setFilter(e.target.value)}
+              value={searchFilter}
+              onChange={e => setSearchFilter(e.target.value)}
             />
           </div>
         </div>
@@ -152,28 +153,28 @@ const Dashboard = () => {
           <table>
             <thead>
               <tr>
-                <th>IP Adresse</th>
-                <th>MAC Adresse</th>
-                <th>Hostname</th>
-                <th>Endet am</th>
-                <th>Aktionen</th>
+                <th>{t('config.ip')}</th>
+                <th>{t('config.mac')}</th>
+                <th>{t('config.hostname')}</th>
+                <th>{t('dashboard.ends_at')}</th>
+                <th>{t('dashboard.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="5">Lade...</td></tr>
+                <tr><td colSpan="5">{t('common.loading')}</td></tr>
               ) : filteredLeases.map((l, idx) => (
                 <tr key={idx}>
                   <td><strong>{l.ip}</strong></td>
                   <td><code>{l['hardware ethernet']}</code></td>
-                  <td>{l['client-hostname'] || 'Unbekannt'}</td>
+                  <td>{l['client-hostname'] || t('dashboard.unknown')}</td>
                   <td>{new Date(l.ends).toLocaleString()}</td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn btn-ghost" title="In Reservierung umwandeln" onClick={() => convertToReservation(l)}>
+                      <button className="btn btn-ghost" title={t('dashboard.convert_to_res')} onClick={() => convertToReservation(l)}>
                         <UserPlus size={18} />
                       </button>
-                      <button className="btn btn-ghost" style={{ color: 'var(--accent-red)' }} title="Lease löschen" onClick={() => deleteLease(l.ip)}>
+                      <button className="btn btn-ghost" style={{ color: 'var(--accent-red)' }} title={t('dashboard.delete_lease')} onClick={() => deleteLease(l.ip)}>
                         <Trash2 size={18} />
                       </button>
                     </div>

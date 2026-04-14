@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Settings, LogOut, Shield } from 'lucide-react';
+import { LayoutDashboard, Settings, LogOut, Shield, Languages } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import Dashboard from './pages/Dashboard';
 import ConfigEditor from './pages/ConfigEditor';
@@ -7,6 +8,7 @@ import Logs from './pages/Logs';
 import Login from './pages/Login';
 
 const App = () => {
+  const { t, i18n } = useTranslation();
   const [user, setUser] = useState(null);
   const [activePage, setActivePage] = useState(localStorage.getItem('activePage') || 'dashboard');
   const [checking, setChecking] = useState(true);
@@ -39,10 +41,15 @@ const App = () => {
     }
   };
 
+  const toggleLanguage = () => {
+    const nextLang = i18n.language === 'en' ? 'de' : 'en';
+    i18n.changeLanguage(nextLang);
+  };
+
   if (checking) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-color)' }}>
-        <div className="fade-in" style={{ color: 'var(--text-secondary)' }}>Lade Sitzung...</div>
+        <div className="fade-in" style={{ color: 'var(--text-secondary)' }}>{t('common.loading')}</div>
       </div>
     );
   }
@@ -61,28 +68,31 @@ const App = () => {
             className={`nav-item ${activePage === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActivePage('dashboard')}
           >
-            <LayoutDashboard size={20} /> Dashboard
+            <LayoutDashboard size={20} /> {t('common.dashboard')}
           </div>
           <div 
             className={`nav-item ${activePage === 'config' ? 'active' : ''}`}
             onClick={() => setActivePage('config')}
           >
-            <Settings size={20} /> Konfiguration
+            <Settings size={20} /> {t('common.configuration')}
           </div>
           <div 
             className={`nav-item ${activePage === 'logs' ? 'active' : ''}`}
             onClick={() => setActivePage('logs')}
           >
-            <Shield size={20} /> Protokoll
+            <Shield size={20} /> {t('common.logs')}
           </div>
         </nav>
 
         <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+          <div className="nav-item" onClick={toggleLanguage}>
+            <Languages size={20} /> {i18n.language.toUpperCase() === 'DE' ? 'Deutsch' : 'English'}
+          </div>
           <div className="nav-item" onClick={handleLogout} style={{ color: 'var(--accent-red)' }}>
-            <LogOut size={20} /> Abmelden
+            <LogOut size={20} /> {t('common.logout')}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Shield size={12} /> Angemeldet als {user}
+            <Shield size={12} /> {t('common.logged_in_as')} {user}
           </div>
         </div>
       </div>
