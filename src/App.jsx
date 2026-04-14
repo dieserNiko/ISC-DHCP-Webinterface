@@ -3,6 +3,7 @@ import { LayoutDashboard, Settings, LogOut, Shield } from 'lucide-react';
 import axios from 'axios';
 import Dashboard from './pages/Dashboard';
 import ConfigEditor from './pages/ConfigEditor';
+import Logs from './pages/Logs';
 import Login from './pages/Login';
 
 const App = () => {
@@ -68,6 +69,12 @@ const App = () => {
           >
             <Settings size={20} /> Konfiguration
           </div>
+          <div 
+            className={`nav-item ${activePage === 'logs' ? 'active' : ''}`}
+            onClick={() => setActivePage('logs')}
+          >
+            <Shield size={20} /> Protokoll
+          </div>
         </nav>
 
         <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
@@ -83,6 +90,7 @@ const App = () => {
       <main className="main-content">
         {activePage === 'dashboard' && <Dashboard />}
         {activePage === 'config' && <ConfigEditor />}
+        {activePage === 'logs' && <Logs />}
       </main>
     </div>
   );

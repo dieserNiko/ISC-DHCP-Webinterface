@@ -5,25 +5,25 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const dhcpdleases = require('dhcpd-leases');
 const DHCPParser = require('./lib/dhcp-parser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SECRET = process.env.JWT_SECRET || 'super-secret-dhcp-key';
+// Fallback for local development, production uses env
+const SECRET = process.env.JWT_SECRET || 'dev-secret-keep-it-in-env';
 
 // PAM Setup
 let pam;
 try {
     pam = require('node-linux-pam');
 } catch (e) {
-    console.warn('PAM module not found. Using mock (admin:admin).');
+    console.warn('PAM module not found. Using NO-AUTH mock (production should have libpam0g-dev).');
     pam = {
         pamAuthenticatePromise: ({ username, password }) => {
             return new Promise((resolve, reject) => {
-                if (username === 'admin' && password === 'admin') resolve();
-                else reject(new Error('Invalid credentials (MOCK)'));
+                reject(new Error('PAM not configured. Mock login disabled for security.'));
             });
         }
     };
@@ -50,7 +50,7 @@ const authenticateToken = (req, res, next) => {
         req.user = verified;
         next();
     } catch (err) {
-        res.status(400).json({ error: 'Invalid token' });
+        res.status(401).json({ error: 'Invalid token' });
     }
 };
 
@@ -74,10 +74,11 @@ app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
         await pam.pamAuthenticatePromise({ username, password });
-        const token = jwt.sign({ username }, SECRET, { expiresIn: '24h' }); // Longer session
+        const token = jwt.sign({ username }, SECRET, { expiresIn: '24h' }); 
         res.cookie('token', token, { httpOnly: true, secure: false });
         res.json({ message: 'Login successful', username });
     } catch (err) {
+        console.error('Auth failure:', err.message);
         res.status(401).json({ error: 'Authentication failed' });
     }
 });
@@ -85,6 +86,31 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/logout', (req, res) => {
     res.clearCookie('token');
     res.json({ message: 'Logged out' });
+});
+
+app.get('/api/logs/stream', authenticateToken, (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const journal = spawn('journalctl', ['-u', 'isc-dhcp-server', '-f', '-n', '100']);
+
+    journal.stdout.on('data', (data) => {
+        const lines = data.toString().split('\n');
+        lines.forEach(line => {
+            if (line.trim()) {
+                res.write(`data: ${JSON.stringify({ line: line.trim() })}\n\n`);
+            }
+        });
+    });
+
+    journal.stderr.on('data', (data) => {
+        console.error(`Journal Error: ${data}`);
+    });
+
+    req.on('close', () => {
+        journal.kill();
+    });
 });
 
 app.get('/api/leases', authenticateToken, (req, res) => {
