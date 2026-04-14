@@ -63,4 +63,5 @@ Ein modernes, performantes und sicheres Webinterface zur Verwaltung von ISC-DHCP
 
 ## Lizenz
 
-MIT License - siehe [LICENSE](LICENSE) für Details.
+MIT License - Copyright (c) 2026 **B&W NetworX GmbH & Co. KG** und **Niko Meister**.
+Siehe [LICENSE](LICENSE) für Details.
